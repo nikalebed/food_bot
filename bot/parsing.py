@@ -22,4 +22,4 @@ def get_delivery(query, lat=55.759208, lng=37.643408):
 
 
 get_delivery("бейгл")
-get_delivery("пицца",55.791046, 37.571103)
+get_delivery("пицца", 55.791046, 37.571103)

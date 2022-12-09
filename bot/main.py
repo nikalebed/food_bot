@@ -5,13 +5,13 @@ import re
 
 bot = telebot.TeleBot("5987759126:AAHL6H-hGHt1EoQMUav_Jz8Eq1CkwPtCH7U")
 
-conn = sqlite3.connect('../data/food_bot_database.db', check_same_thread=False)
+conn = sqlite3.connect('/Users/evalebedyuk/Desktop/food_data.db', check_same_thread=False)
 cursor = conn.cursor()
 
 
-def db_table_val(user_id: int, user_name: str, likes_dislikes: int, food_name: str):
-    cursor.execute('INSERT INTO preferences (user_id, user_name, likes_dislikes, food_name) VALUES (?, ?, ?, ?)',
-                   (user_id, user_name, likes_dislikes, food_name))
+def db_table_val(user_id: int, user_name: str, likes_dislikes: int, ingredient_name: str):
+    cursor.execute('INSERT INTO preferences (user_id, user_name, likes_dislikes, ingredient_name) VALUES (?, ?, ?, ?)',
+                   (user_id, user_name, likes_dislikes, ingredient_name))
     conn.commit()
 
 
@@ -41,13 +41,13 @@ def help_message(message):
 
 def add_ingredient(food: str, pref: int, message):
     pref_to_words = ["нелюбимых", "любимых"]
-    query = f'select likes_dislikes from preferences where user_id = \'{message.from_user.id}\' and food_name = \'{food}\''
+    query = f'select likes_dislikes from preferences where user_id = \'{message.from_user.id}\' and ingredient_name = \'{food}\''
 
     previous_pref = cursor.execute(query).fetchone()
 
     if previous_pref is None:
         db_table_val(user_id=message.from_user.id, user_name=message.from_user.username, likes_dislikes=pref,
-                     food_name=food)
+                     ingredient_name=food)
         bot.send_message(message.chat.id,
                          f"{food} теперь в вашей базе {pref_to_words[pref]}, @{message.from_user.username}")
     elif previous_pref[0] == pref:
@@ -60,7 +60,7 @@ def add_ingredient(food: str, pref: int, message):
 
 def remove_ingredient(food: str, pref: int, message):
     pref_to_words = ["нелюбимых", "любимых"]
-    query = f'select id from preferences where user_id = \'{message.from_user.id}\' and food_name = \'{food}\''
+    query = f'select id from preferences where user_id = \'{message.from_user.id}\' and ingredient_name = \'{food}\''
 
     id_to_be_removed = cursor.execute(query).fetchone()
 
@@ -150,7 +150,7 @@ def remove_dislikes(message):
 
 @bot.message_handler(commands=['my_likes'])
 def my_likes(message):
-    query = f'select food_name from preferences where user_id =  \'{message.from_user.id} \' and likes_dislikes = 1'
+    query = f'select ingredient_name from preferences where user_id =  \'{message.from_user.id} \' and likes_dislikes = 1'
     likes = cursor.execute(query).fetchall()
     bot.send_message(message.chat.id,
                      f"Любимые ингредиенты @{message.from_user.username}:\n\n" + "\n".join(map(lambda x: x[0], likes)))
@@ -158,7 +158,7 @@ def my_likes(message):
 
 @bot.message_handler(commands=['my_dislikes'])
 def my_likes(message):
-    query = f'select food_name from preferences where user_id =  \'{message.from_user.id} \' and likes_dislikes = 0'
+    query = f'select ingredient_name from preferences where user_id =  \'{message.from_user.id} \' and likes_dislikes = 0'
     likes = cursor.execute(query).fetchall()
     bot.send_message(message.chat.id,
                      f"Нелюбимые ингредиенты @{message.from_user.username} 🤢:\n\n" + "\n".join(
