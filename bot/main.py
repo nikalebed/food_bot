@@ -5,7 +5,7 @@ import re
 
 bot = telebot.TeleBot("5987759126:AAHL6H-hGHt1EoQMUav_Jz8Eq1CkwPtCH7U")
 
-conn = sqlite3.connect('food_bot_database.db', check_same_thread=False)
+conn = sqlite3.connect('../data/food_bot_database.db', check_same_thread=False)
 cursor = conn.cursor()
 
 
