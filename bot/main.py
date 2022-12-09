@@ -1,11 +1,11 @@
 import sqlite3
 import telebot
-from ast import arguments
+
 import re
 
 bot = telebot.TeleBot("5987759126:AAHL6H-hGHt1EoQMUav_Jz8Eq1CkwPtCH7U")
 
-conn = sqlite3.connect('/Users/evalebedyuk/Desktop/food_data.db', check_same_thread=False)
+conn = sqlite3.connect("/Users/evalebedyuk/Desktop/food_data.db", check_same_thread=False)
 cursor = conn.cursor()
 
 
