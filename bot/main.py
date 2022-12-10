@@ -1,17 +1,30 @@
 import sqlite3
 import telebot
-
 import re
 
-bot = telebot.TeleBot("5987759126:AAHL6H-hGHt1EoQMUav_Jz8Eq1CkwPtCH7U")
+with open("secret.txt") as file:
+    lines = [line.rstrip() for line in file]
+    TOKEN = lines[0]
+    DB_PATH = lines[1]
 
-conn = sqlite3.connect("/Users/evalebedyuk/Desktop/food_data.db", check_same_thread=False)
+bot = telebot.TeleBot(TOKEN)
+
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cursor = conn.cursor()
 
 
-def db_table_val(user_id: int, user_name: str, likes_dislikes: int, ingredient_name: str):
-    cursor.execute('INSERT INTO preferences (user_id, user_name, likes_dislikes, ingredient_name) VALUES (?, ?, ?, ?)',
-                   (user_id, user_name, likes_dislikes, ingredient_name))
+def db_add_preference(user_id: int, user_name: str, likes_dislikes: int, ingredient_name: str, eda_ru_ids: str = None):
+    cursor.execute(
+        'INSERT INTO preferences (user_id, user_name, likes_dislikes, ingredient_name, eda_ru_ids) VALUES (?, ?, ?, ?, ?)',
+        (user_id, user_name, likes_dislikes, ingredient_name, eda_ru_ids))
+    conn.commit()
+
+
+def db_add_favourite(user_id: int, user_name: str, dish_name: str, dish_url: str, dish_type, dish_prep_time,
+                     dish_people_count):
+    cursor.execute(
+        'INSERT INTO favourite_recipes (user_id, user_name, dish_name, dish_url, dish_type, dish_prep_time, dish_people_count) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (user_id, user_name, dish_name, dish_url, dish_type, dish_prep_time, dish_people_count))
     conn.commit()
 
 
@@ -39,6 +52,30 @@ def help_message(message):
 ''', parse_mode="markdown")
 
 
+def get_3_favourites(type, prep_time, people_count):
+    query = f'SELECT dish_name, dish_url from favourite_recipes WHERE dish_type = \'{type}\' and dish_prep_time = \'{prep_time}\' dish_people_count = \'{people_count}\''
+    favs = cursor.execute(query).fetchall()[:3]
+
+    favs_dict = {}
+    for fav in favs:
+        favs_dict[fav[0]] = fav[1]
+
+    return favs_dict
+
+
+def get_ids(food: str, pref):
+    if pref == 0:
+        return None
+
+    query = f"SELECT eda_ru_id from eda_ru_ids WHERE ingredient_name LIKE '%{food}%'"
+
+    ids = cursor.execute(query).fetchall()
+    if len(ids) == 0:
+        return None
+    else:
+        return " ".join(map(lambda x: str(x[0]), ids))
+
+
 def add_ingredient(food: str, pref: int, message):
     pref_to_words = ["нелюбимых", "любимых"]
     query = f'select likes_dislikes from preferences where user_id = \'{message.from_user.id}\' and ingredient_name = \'{food}\''
@@ -46,8 +83,8 @@ def add_ingredient(food: str, pref: int, message):
     previous_pref = cursor.execute(query).fetchone()
 
     if previous_pref is None:
-        db_table_val(user_id=message.from_user.id, user_name=message.from_user.username, likes_dislikes=pref,
-                     ingredient_name=food)
+        db_add_preference(user_id=message.from_user.id, user_name=message.from_user.username, likes_dislikes=pref,
+                          ingredient_name=food, eda_ru_ids=get_ids(food, pref))
         bot.send_message(message.chat.id,
                          f"{food} теперь в вашей базе {pref_to_words[pref]}, @{message.from_user.username}")
     elif previous_pref[0] == pref:
