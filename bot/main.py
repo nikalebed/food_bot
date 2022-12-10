@@ -3,7 +3,9 @@ from dataclasses import dataclass, field
 
 import telebot
 import re
-from telebot import types
+from markups import get_dish_type_markup, get_prep_time_markup, \
+    get_delivery_markup, get_is_fav_markup, get_add_to_fav_markup, \
+    get_people_count_markup
 
 import parsing
 import formatting
@@ -14,6 +16,17 @@ with open("secret.txt") as file:
     DB_PATH = lines[1]
 
 bot = telebot.TeleBot(TOKEN)
+bot.set_my_commands([
+    telebot.types.BotCommand("/start", "starts the bot"),
+    telebot.types.BotCommand("/help", "shows bot functional"),
+    telebot.types.BotCommand("/find_dish", "finds dish"),
+    telebot.types.BotCommand("/add_likes", "adds ingrs to likes"),
+    telebot.types.BotCommand("/add_dislikes", "adds ingrs to dislikes"),
+    telebot.types.BotCommand("/remove_likes", "removes ingrs from likes"),
+    telebot.types.BotCommand("/remove_dislikes", "removes ingrs remove dislikes"),
+    telebot.types.BotCommand("/my_likes", "shows likes"),
+    telebot.types.BotCommand("/my_dislikes", "shows dislikes"),
+])
 
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cursor = conn.cursor()
@@ -50,13 +63,14 @@ def help_message(message):
 
 Найти блюдо по вашим предпочтениям: */find_dish*
 👇👇👇
-Добавить новый любимый ингредиент: */add_likes ингредиент1, ингредиент2, ...*
-Добавить новый НЕ любимый ингредиент: */add_dislikes ингредиент1, ингредиент2, ...*
-Убрать любимый ингредиент: */remove_likes ингредиент1, ингредиент2, ...*
-Убрать НЕ любимый ингредиент: */remove_dislikes ингредиент1, ингредиент2, ...*
+Добавить желаемые ингредиенты: */add_likes ингредиент1, ингредиент2, ...*
+Добавить нелюбимые ингредиенты: */add_dislikes ингредиент1, ингредиент2, ...*
+
+Убрать ингредиенты из желаемых: */remove_likes ингредиент1, ингредиент2, ...*
+Убрать ингредиенты из нелюбимых: */remove_dislikes ингредиент1, ингредиент2, ...*
 👇👇👇
-Посмотреть любимое: */my_likes*
-Посмотреть НЕ любимое: */my_dislikes*
+Посмотреть желаемое: */my_likes*
+Посмотреть нелюбимое: */my_dislikes*
 ''', parse_mode="markdown")
 
 
@@ -85,7 +99,7 @@ def get_ids(food: str, pref):
 
 
 def add_ingredient(food: str, pref: int, message):
-    pref_to_words = ["нелюбимых", "любимых"]
+    pref_to_words = ["нелюбимых", "желаемых"]
     query = f'select likes_dislikes from preferences where user_id = \'{message.from_user.id}\' and ingredient_name = \'{food}\''
 
     previous_pref = cursor.execute(query).fetchone()
@@ -104,7 +118,7 @@ def add_ingredient(food: str, pref: int, message):
 
 
 def remove_ingredient(food: str, pref: int, message):
-    pref_to_words = ["нелюбимых", "любимых"]
+    pref_to_words = ["нелюбимых", "желаемых"]
     query = f'select id from preferences where user_id = \'{message.from_user.id}\' and ingredient_name = \'{food}\''
 
     id_to_be_removed = cursor.execute(query).fetchone()
@@ -131,7 +145,7 @@ def add_likes(message):
     if len(likes_to_be_added) == 0:
         bot.send_message(message.chat.id, '''
 К сожалению, я не умею читать мысли...
-Введите название ващего любимого ингредиента!
+Введите название желаемого ингредиента!
                ''')
         return
 
@@ -167,7 +181,7 @@ def remove_likes(message):
     if len(likes_to_be_removed) == 0:
         bot.send_message(message.chat.id, '''
 К сожалению, я не умею читать мысли...
-Введите название ващего любимого ингредиента!
+Введите название желаемого ингредиента!
                ''')
         return
 
@@ -198,7 +212,7 @@ def my_likes(message):
     query = f'select ingredient_name from preferences where user_id =  \'{message.from_user.id} \' and likes_dislikes = 1'
     likes = cursor.execute(query).fetchall()
     bot.send_message(message.chat.id,
-                     f"Любимые ингредиенты @{message.from_user.username}:\n\n" + "\n".join(map(lambda x: x[0], likes)))
+                     f"Желаемые ингредиенты @{message.from_user.username}:\n\n" + "\n".join(map(lambda x: x[0], likes)))
 
 
 @bot.message_handler(commands=['my_dislikes'])
@@ -218,100 +232,8 @@ class DishQuery:
     dish_urls: list = field(default_factory=list)
     dish_type: str = ""
     dish_prep_time: int = 0
-    dish_people_count: int = 0
+    dish_people_count: list = field(default_factory=list)
     is_fav: bool = False
-    status: int = 0
-
-
-def get_dish_type_markup():
-    markup_dish_type = types.InlineKeyboardMarkup()
-    breakfast = types.InlineKeyboardButton(text="завтрак",
-                                           callback_data="type breakfast")
-    lunch = types.InlineKeyboardButton(text="обед", callback_data="type lunch")
-    dinner = types.InlineKeyboardButton(text="ужин",
-                                        callback_data="type dinner")
-    snack = types.InlineKeyboardButton(text="перекус",
-                                       callback_data="type snack")
-    dessert = types.InlineKeyboardButton(text="десерт",
-                                         callback_data="type dessert")
-
-    markup_dish_type.add(breakfast, lunch, dinner, snack, dessert)
-    return markup_dish_type
-
-
-def get_prep_time_markup():
-    markup_prep_time = types.InlineKeyboardMarkup()
-    b1 = types.InlineKeyboardButton(text="1 -15 мин",
-                                    callback_data="prep_time 15")
-    b2 = types.InlineKeyboardButton(text="15 - 45 мин",
-                                    callback_data="prep_time 45")
-    b3 = types.InlineKeyboardButton(text="45мин - 1,5часа",
-                                    callback_data="prep_time 90")
-    b4 = types.InlineKeyboardButton(text="45мин - 1,5часа",
-                                    callback_data="prep_time 1000")
-    markup_prep_time.add(b1, b2, b3, b4)
-    return markup_prep_time
-
-
-def get_people_count_markup():
-    markup_people_count = types.InlineKeyboardMarkup()
-    b1 = types.InlineKeyboardButton(text="1",
-                                    callback_data="people_count 1")
-    b2 = types.InlineKeyboardButton(text="2",
-                                    callback_data="people_count 2")
-    b3 = types.InlineKeyboardButton(text="3-4",
-                                    callback_data="people_count 4")
-    b4 = types.InlineKeyboardButton(text="5+",
-                                    callback_data="people_count 5")
-    markup_people_count.add(b1, b2, b3, b4)
-    return markup_people_count
-
-
-def get_is_fav_markup():
-    markup = types.InlineKeyboardMarkup()
-    b1 = types.InlineKeyboardButton(text="хочу",
-                                    callback_data="is_fav 1")
-    b2 = types.InlineKeyboardButton(text="не надо",
-                                    callback_data="is_fav 0")
-    markup.add(b1, b2)
-    return markup
-
-
-def get_delivery_markup(options):
-    markup = types.InlineKeyboardMarkup()
-    b = types.InlineKeyboardButton(text="нет",
-                                   callback_data=f"deliver no")
-    markup.add(b)
-    for i in range(len(options)):
-        b = types.InlineKeyboardButton(text=f"для варианта {i + 1}",
-                                       callback_data=f"deliver {i}")
-        markup.add(b)
-    return markup
-
-
-def get_add_to_fav_markup(option, options):
-    if option != 'no':
-        return get_add_to_fav_from_del_markup(option)
-
-    markup = types.InlineKeyboardMarkup()
-    b = types.InlineKeyboardButton(text="нет",
-                                   callback_data=f"add_fav no")
-    markup.add(b)
-    for i in range(len(options)):
-        b = types.InlineKeyboardButton(text=f"вариант {i + 1}",
-                                       callback_data=f"add_fav {i}")
-        markup.add(b)
-    return markup
-
-
-def get_add_to_fav_from_del_markup(option):
-    markup = types.InlineKeyboardMarkup()
-    b1 = types.InlineKeyboardButton(text="да",
-                                    callback_data=f"add_fav {option}")
-    b2 = types.InlineKeyboardButton(text="нет",
-                                    callback_data="add_fav 0")
-    markup.add(b1, b2)
-    return markup
 
 
 dish_queries = {}
@@ -320,7 +242,6 @@ dish_queries = {}
 @bot.message_handler(commands=['find_dish'])
 def get_dish(message):
     dish_queries[message.chat.id] = DishQuery()
-    dish_queries[message.chat.id].status = 1
     dish_queries[message.chat.id].user_id = message.from_user.id
     dish_queries[message.chat.id].user_name = message.from_user.username
 
@@ -331,17 +252,14 @@ def get_dish(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('type'))
 def answer_dish_type(call):
-    if dish_queries[call.message.chat.id].status != 1:
-        return
-    dish_queries[call.message.chat.id].status = 2
     dish_type = call.data.split()[1]
     dish_queries[call.message.chat.id].dish_type = dish_type
 
-    # markup = telebot.types.ReplyKeyboardMarkup()
     bot.edit_message_reply_markup(call.message.chat.id,
                                   call.message.id,
                                   reply_markup=None)
-    bot.edit_message_text(f"ищем {dish_type}", call.message.chat.id,
+    bot.edit_message_text(formatting.format_dish_type_answer(dish_type),
+                          call.message.chat.id,
                           call.message.id)
 
     markup = get_prep_time_markup()
@@ -352,17 +270,14 @@ def answer_dish_type(call):
 
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('prep_time'))
-def answer_dish_type(call):
-    if dish_queries[call.message.chat.id].status != 2:
-        return
-    dish_queries[call.message.chat.id].status = 3
+def answer_prep_type(call):
     prep_time = call.data.split()[1]
     dish_queries[call.message.chat.id].dish_prep_time = int(prep_time)
 
     bot.edit_message_reply_markup(call.message.chat.id,
                                   call.message.id,
                                   reply_markup=None)
-    bot.edit_message_text(f"готовим за {prep_time} минут",
+    bot.edit_message_text(formatting.format_prep_time_answer(prep_time),
                           call.message.chat.id,
                           call.message.id)
 
@@ -374,17 +289,15 @@ def answer_dish_type(call):
 
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('people_count'))
-def answer_dish_type(call):
-    if dish_queries[call.message.chat.id].status != 3:
-        return
-    dish_queries[call.message.chat.id].status = 4
-    people_count = call.data.split()[1]
-    dish_queries[call.message.chat.id].dish_people_count = int(people_count)
+def answer_people_count(call):
+    people_count = [int(call.data.split()[1]), int(call.data.split()[2])]
+    dish_queries[call.message.chat.id].dish_people_count = people_count
 
     bot.edit_message_reply_markup(call.message.chat.id,
                                   call.message.id,
                                   reply_markup=None)
-    bot.edit_message_text(f"готовим {people_count} порций",
+
+    bot.edit_message_text(formatting.format_people_count_answer(people_count),
                           call.message.chat.id,
                           call.message.id)
 
@@ -397,23 +310,18 @@ def answer_dish_type(call):
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('is_fav'))
 def answer_is_fav(call):
-    if dish_queries[call.message.chat.id].status != 4:
-        return
-    dish_queries[call.message.chat.id].status = 5
     is_fav = call.data.split()[1]
     dish_queries[call.message.chat.id].is_fav = int(is_fav)
 
     bot.edit_message_reply_markup(call.message.chat.id,
                                   call.message.id,
                                   reply_markup=None)
-    bot.edit_message_text(f"из избранного {is_fav}",
+    formatting.format_is_fav_answer(is_fav)
+    bot.edit_message_text(formatting.format_is_fav_answer(is_fav),
                           call.message.chat.id,
                           call.message.id)
 
-    bot.send_message(chat_id=call.message.chat.id,
-                     text="сейчас найдем")
-
-    result = get_result(dish_queries[call.message.chat.id])
+    result = get_recipes_result(dish_queries[call.message.chat.id])
 
     if not result:
         bot.send_message(chat_id=call.message.chat.id,
@@ -428,7 +336,7 @@ def answer_is_fav(call):
                      parse_mode="HTML")
     print("receipt options:", result.keys())
 
-    markup = get_delivery_markup(result.keys())
+    markup = get_delivery_markup()
     bot.send_message(chat_id=call.message.chat.id,
                      text="посмотреть опции достаки?",
                      reply_markup=markup)
@@ -436,33 +344,34 @@ def answer_is_fav(call):
 
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('deliver'))
-def answer_dish_type(call):
-    deliver_option = call.data.split()[1]
-
+def answer_deliver(call):
+    deliver = call.data.split()[1]
     bot.edit_message_reply_markup(call.message.chat.id,
                                   call.message.id,
                                   reply_markup=None)
-    bot.edit_message_text(f"доставка {deliver_option})",
-                          call.message.chat.id,
-                          call.message.id)
+    try:
+        bot.edit_message_text(formatting.format_delivery_answer(deliver),
+                              call.message.chat.id,
+                              call.message.id)
+    except:
+        bot.delete_message(call.message.chat.id,
+                           call.message.id, )
     options = dish_queries[
         call.message.chat.id].dish_names
 
-    if deliver_option != "no":
-        deliver_option = int(deliver_option)
-        name = options[deliver_option]
-        result = parsing.get_delivery(name)
-        print(result)
-        if not result:
-            bot.send_message(chat_id=call.message.chat.id,
-                             text=f"не нашел {name} в доставке")
-        else:
-            bot.send_message(chat_id=call.message.chat.id,
-                             text=formatting.format_deliveries(result),
-                             parse_mode="HTML")
+    if deliver == "yes":
+        deliveries = []
+        for i, name in enumerate(options):
+            result = parsing.get_delivery(name)
+            print(result)
+            deliveries += [result]
+
+        bot.send_message(chat_id=call.message.chat.id,
+                         text=formatting.format_deliveries(deliveries),
+                         parse_mode="HTML")
 
     if not dish_queries[call.message.chat.id].is_fav:
-        markup = get_add_to_fav_markup(deliver_option, options)
+        markup = get_add_to_fav_markup(options)
         bot.send_message(chat_id=call.message.chat.id,
                          text="добавить рецепт в избранное?",
                          reply_markup=markup)
@@ -470,13 +379,13 @@ def answer_dish_type(call):
 
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('add_fav'))
-def answer_dish_type(call):
+def answer_add_fav(call):
     add_fav = call.data.split()[1]
 
     bot.edit_message_reply_markup(call.message.chat.id,
                                   call.message.id,
                                   reply_markup=None)
-    bot.edit_message_text(f"добавить в избранное {add_fav})",
+    bot.edit_message_text(formatting.format_add_fav_answer(add_fav),
                           call.message.chat.id,
                           call.message.id)
 
@@ -488,18 +397,17 @@ def answer_dish_type(call):
                          dq.dish_type, dq.dish_prep_time, dq.dish_people_count)
 
 
-def get_result(dish_query: DishQuery):
+def get_recipes_result(dish_query: DishQuery):
     if dish_query.is_fav:
         return get_3_favourites(dish_query.dish_type,
                                 dish_query.dish_prep_time,
                                 dish_query.dish_people_count)
-
     query = f'select ingredient_name from preferences where user_id =  \'{dish_query.user_id} \' and likes_dislikes = 1'
     likes = list(map(lambda x: x[0], cursor.execute(query).fetchall()))
 
     query = f'select ingredient_name from preferences where user_id =  \'{dish_query.user_id} \' and likes_dislikes = 0'
-    dislikes = list(map(lambda x: x[0], cursor.execute(query).fetchall()))
 
+    dislikes = list(map(lambda x: x[0], cursor.execute(query).fetchall()))
     return parsing.get_recipes(likes, dislikes, dish_query.dish_type,
                                dish_query.dish_people_count,
                                dish_query.dish_prep_time)
