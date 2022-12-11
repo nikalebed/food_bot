@@ -1,7 +1,7 @@
 def format_dishes(result: dict):
     s = "вот, что я нашел:\n"
     for i, dish_name in enumerate(result.keys()):
-        s += f"{i + 1}) <a href='https://eda.ru/recepty{result[dish_name]}'>{dish_name}</a> \n"
+        s += f"{i + 1}) <a href='https://eda.ru{result[dish_name]}'>{dish_name}</a> \n"
     return s
 
 
@@ -26,7 +26,7 @@ def format_delivery_answer(deliver):
 def format_add_fav_answer(add_fav):
     if add_fav == "no":
         return f"не добавлять в избранное"
-    return f"добавить {int(add_fav) + 1}) в избранное"
+    return f"добавил {int(add_fav) + 1}) в избранное"
 
 
 def format_dish_type_answer(dish_type):

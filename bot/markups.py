@@ -39,7 +39,7 @@ def get_people_count_markup():
     b2 = types.InlineKeyboardButton(text="2",
                                     callback_data="people_count 2 2")
     b3 = types.InlineKeyboardButton(text="3-4",
-                                    callback_data="people_count 4 4")
+                                    callback_data="people_count 3 4")
     b4 = types.InlineKeyboardButton(text="5+",
                                     callback_data="people_count 5 100")
     markup_people_count.add(b1, b2, b3, b4)

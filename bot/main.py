@@ -43,7 +43,7 @@ def db_add_favourite(user_id: int, user_name: str, dish_name: str, dish_url: str
                      dish_people_count):
     cursor.execute(
         'INSERT INTO favourite_recipes (user_id, user_name, dish_name, dish_url, dish_type, dish_prep_time, dish_people_count) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (user_id, user_name, dish_name, dish_url, dish_type, dish_prep_time, dish_people_count))
+        (user_id, user_name, dish_name, dish_url, dish_type, dish_prep_time, str(dish_people_count)))
     conn.commit()
 
 
@@ -75,13 +75,13 @@ def help_message(message):
 
 
 def get_3_favourites(type, prep_time, people_count):
-    query = f'SELECT dish_name, dish_url from favourite_recipes WHERE dish_type = \'{type}\' and dish_prep_time = \'{prep_time}\' and dish_people_count = \'{people_count}\''
+    query = f'SELECT dish_name, dish_url from favourite_recipes WHERE dish_type = \'{type}\' and dish_prep_time = \'{prep_time}\' and dish_people_count = \'{str(people_count)}\''
     favs = cursor.execute(query).fetchall()[:3]
-
+    print(type, prep_time, str(people_count))
     favs_dict = {}
     for fav in favs:
         favs_dict[fav[0]] = fav[1]
-
+    print(favs_dict)
     return favs_dict
 
 
@@ -237,6 +237,7 @@ class DishQuery:
 
 
 dish_queries = {}
+latest_finds = {}
 
 
 @bot.message_handler(commands=['find_dish'])
@@ -244,7 +245,7 @@ def get_dish(message):
     dish_queries[message.chat.id] = DishQuery()
     dish_queries[message.chat.id].user_id = message.from_user.id
     dish_queries[message.chat.id].user_name = message.from_user.username
-
+    latest_finds[message.chat.id] = message.date
     markup = get_dish_type_markup()
     bot.send_message(chat_id=message.chat.id, text="Выберите тип блюда",
                      reply_markup=markup)
@@ -252,6 +253,9 @@ def get_dish(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('type'))
 def answer_dish_type(call):
+    if latest_finds[call.message.chat.id] > call.message.date:
+        return
+
     dish_type = call.data.split()[1]
     dish_queries[call.message.chat.id].dish_type = dish_type
 
@@ -271,6 +275,9 @@ def answer_dish_type(call):
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('prep_time'))
 def answer_prep_type(call):
+    if latest_finds[call.message.chat.id] > call.message.date:
+        return
+
     prep_time = call.data.split()[1]
     dish_queries[call.message.chat.id].dish_prep_time = int(prep_time)
 
@@ -290,6 +297,9 @@ def answer_prep_type(call):
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('people_count'))
 def answer_people_count(call):
+    if latest_finds[call.message.chat.id] > call.message.date:
+        return
+
     people_count = [int(call.data.split()[1]), int(call.data.split()[2])]
     dish_queries[call.message.chat.id].dish_people_count = people_count
 
@@ -310,6 +320,9 @@ def answer_people_count(call):
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('is_fav'))
 def answer_is_fav(call):
+    if latest_finds[call.message.chat.id] > call.message.date:
+        return
+
     is_fav = call.data.split()[1]
     dish_queries[call.message.chat.id].is_fav = int(is_fav)
 
@@ -345,6 +358,9 @@ def answer_is_fav(call):
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('deliver'))
 def answer_deliver(call):
+    if latest_finds[call.message.chat.id] > call.message.date:
+        return
+
     deliver = call.data.split()[1]
     bot.edit_message_reply_markup(call.message.chat.id,
                                   call.message.id,
@@ -380,6 +396,9 @@ def answer_deliver(call):
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith('add_fav'))
 def answer_add_fav(call):
+    if latest_finds[call.message.chat.id] > call.message.date:
+        return
+
     add_fav = call.data.split()[1]
 
     bot.edit_message_reply_markup(call.message.chat.id,
