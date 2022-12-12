@@ -1,4 +1,3 @@
-import sqlite3
 from dataclasses import dataclass, field
 
 import telebot
@@ -9,11 +8,14 @@ from markups import get_dish_type_markup, get_prep_time_markup, \
 
 import parsing
 import formatting
+from data import storage
+
+conn = storage.conn
+cursor = storage.cursor
 
 with open("secret.txt") as file:
     lines = [line.rstrip() for line in file]
     TOKEN = lines[0]
-    DB_PATH = lines[1]
 
 bot = telebot.TeleBot(TOKEN)
 bot.set_my_commands([
@@ -27,9 +29,6 @@ bot.set_my_commands([
     telebot.types.BotCommand("/my_likes", "shows likes"),
     telebot.types.BotCommand("/my_dislikes", "shows dislikes"),
 ])
-
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-cursor = conn.cursor()
 
 
 def db_add_preference(user_id: int, user_name: str, likes_dislikes: int, ingredient_name: str, eda_ru_ids: str = None):
@@ -430,9 +429,6 @@ def get_recipes_result(dish_query: DishQuery):
     return parsing.get_recipes(likes, dislikes, dish_query.dish_type,
                                dish_query.dish_people_count,
                                dish_query.dish_prep_time)
-
-
-# bot.polling(none_stop=True)
 
 
 bot.polling(none_stop=True)

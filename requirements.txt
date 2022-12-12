@@ -1,0 +1,5 @@
+beautifulsoup4
+requests
+lxml
+pytelegrambotapi==4.7.0
+dataclasses
