@@ -66,8 +66,12 @@ def get_delivery(query, lat=55.759208, lng=37.643408):
     data = json.loads(page)
     deliveries = []
     for x in data['blocks'][0]['payload']:
-        deliveries.append(
-            f"https://eda.yandex.ru/r/{x['brand']['slug']}?category={x['items'][0]['parent_category_id']}")
+        try:
+            deliveries.append(
+                f"https://eda.yandex.ru/r/{x['brand']['slug']}?category={x['items'][0]['parent_category_id']}")
+        except:
+            return  deliveries.append(
+                f"https://eda.yandex.ru/r/{x['brand']['slug']}")
     return deliveries
 
 # print(get_delivery('бейгл'))
